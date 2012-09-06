@@ -1,24 +1,21 @@
 from imposm.parser import OSMParser
-from collections import deque
-import shelve
+from couchdbkit import Server
 
 class p:
 	def __init__(self):
-		self.coords=shelve.open("cwm.coords")
-		self.nodes=shelve.open("cwm.nodes")
-		self.ways=shelve.open("cwm.ways")
-		self.rels=shelve.open("cwm.rels")
+		server = Server()
+		self.db=server.get_or_create_db("b")
 		self.i=0
 		self.parser=OSMParser(nodes_callback=self.coord, ways_callback=self.way, relations_callback=self.rel, coords_callback=self.coord)
 	def parse(self,x):
 		self.parser.parse(x)
 	def coord(self,c):
 		out=dict()
-		for osm_id,lng,lat in c:
+		for osm_id,lat,lng in c:
 			out["type"]="coord"
 			out["_id"]=str(osm_id)
-			out["geometry"]={"type":"Point","coordinates":[lng,lat]}
-			self.coords[str(osm_id)]=out
+			out["geometry"]={"type":"Point","coordinates":lng}
+			self.db["c"+str(osm_id)]=out
 		self.i=self.i+1
 		print "cached a coord totoal now "+str(self.i)
 	def node(self,n):
@@ -31,7 +28,7 @@ class p:
 			for k in tags:
 				if k !="type" and k!="_id"and k!="geometry":
 					out[k]=tags[k]
-			self.nodes[str(osm_id)]=out
+			self.db[str(osm_id)]=out
 		self.i=self.i+1
 		print "cached a node totoal now "+str(self.i)
 	def way(self,w):
@@ -43,7 +40,7 @@ class p:
 			for k in tags:
 				if k !="type" and k!="_id"and k!="members":
 					out[k]=tags[k]
-			self.ways[str(osm_id)]=out
+			self.db[str(osm_id)]=out
 		self.i=self.i+1
 		print "cached a way totoal now "+str(self.i)
 	def rel(self,r):
@@ -55,14 +52,9 @@ class p:
 			for k in tags:
 				if k !="type" and k!="_id"and k!="members":
 					out[k]=tags[k]
-			self.rels[str(osm_id)]=out
+			self.db[str(osm_id)]=out
 		self.i=self.i+1
 		print "cached a rel totoal now "+str(self.i)
-	def close(self):
-		self.coords.close()
-		self.nodes.close()
-		self.ways.close()
-		self.rels.close()
 	def clean(self):
 		for k in self.nodes:
 			if self.coords.has_key(k):
@@ -70,7 +62,5 @@ class p:
 def cache(x):
 	c=p()
 	c.parse(x)
-	c.clean()
-	c.close()
 		
 
